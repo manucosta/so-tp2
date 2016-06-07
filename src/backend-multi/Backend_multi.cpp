@@ -1,5 +1,4 @@
-#include "Backend_mono.h"
-
+#include "Backend_multi.h"
 
 using namespace std;
 
@@ -16,8 +15,14 @@ unsigned int ancho = -1;
 unsigned int alto = -1;
 
 //Agregado por nosotros
-RWLock mutex_casillero;
-
+vector<vector<RWLock>> mutex_casillero;
+vector<pthread_t> clientes;
+int cant_clientes = 0;
+pthread_mutex_t mutex_clientes;
+string nombre_equipo1 = "";
+string nombre_equipo2 = "";
+pthread_mutex_t mutex_equipos;
+// FALTA: DIFERENCIAR ENTRE EQUIPO 1 Y EQUIPO 2
 
 bool cargar_int(const char* numero, unsigned int& n) {
     char *eptr;
@@ -30,82 +35,91 @@ bool cargar_int(const char* numero, unsigned int& n) {
 }
 
 int main(int argc, const char* argv[]) {
+  // manejo la señal SIGINT para poder cerrar el socket cuando cierra el programa
+  signal(SIGINT, cerrar_servidor);
 
-    // manejo la señal SIGINT para poder cerrar el socket cuando cierra el programa
-    signal(SIGINT, cerrar_servidor);
+  // parsear argumentos
+  if (argc < 3) {
+      cerr << "Faltan argumentos, la forma de uso es:" << endl <<
+      argv[0] << " N M" << endl << "N = ancho del tablero , M = alto del tablero" << endl;
+      return 3;
+  }
+  else {
+      if (!cargar_int(argv[1], ancho)) {
+          cerr << argv[1] << " debe ser un número" << endl;
+          return 5;
+      }
+      if (!cargar_int(argv[2], alto)) {
+          cerr << argv[2] << " debe ser un número" << endl;
+          return 5;
+      }
+  }
 
-    // parsear argumentos
-    if (argc < 3) {
-        cerr << "Faltan argumentos, la forma de uso es:" << endl <<
-        argv[0] << " N M" << endl << "N = ancho del tablero , M = alto del tablero" << endl;
-        return 3;
-    }
+  // inicializar ambos tableros, se accede como tablero[fila][columna]
+  tablero_equipo1 = vector<vector<char> >(alto);
+  for (unsigned int i = 0; i < alto; ++i) {
+      tablero_equipo1[i] = vector<char>(ancho, VACIO);
+  }
+
+  tablero_equipo2 = vector<vector<char> >(alto);
+  for (unsigned int i = 0; i < alto; ++i) {
+      tablero_equipo2[i] = vector<char>(ancho, VACIO);
+  }
+
+  int socketfd_cliente, socket_size;
+  struct sockaddr_in local, remoto;
+
+  // crear un socket de tipo INET con TCP (SOCK_STREAM)
+  if ((socket_servidor = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+      cerr << "Error creando socket" << endl;
+  }
+
+  // permito reusar el socket para que no tire el error "Address Already in Use"
+  int flag = 1;
+  setsockopt(socket_servidor, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+
+  // crear nombre, usamos INADDR_ANY para indicar que cualquiera puede conectarse aquí
+  local.sin_family = AF_INET;
+  local.sin_addr.s_addr = INADDR_ANY;
+  local.sin_port = htons(PORT);
+  if (bind(socket_servidor, (struct sockaddr *)&local, sizeof(local)) == -1) {
+      cerr << "Error haciendo bind!" << endl;
+      return 1;
+  }
+
+  // escuchar en el socket
+  if (listen(socket_servidor, 1) == -1) {
+      cerr << "Error escuchando socket!" << endl;
+      return 1;
+  }
+
+  // aceptar conexiones entrantes.
+  socket_size = sizeof(remoto);
+  while (true) {
+    if ((socketfd_cliente = accept(socket_servidor, (struct sockaddr*) &remoto, (socklen_t*) &socket_size)) == -1)
+        cerr << "Error al aceptar conexion" << endl;
     else {
-        if (!cargar_int(argv[1], ancho)) {
-            cerr << argv[1] << " debe ser un número" << endl;
-            return 5;
-        }
-        if (!cargar_int(argv[2], alto)) {
-            cerr << argv[2] << " debe ser un número" << endl;
-            return 5;
-        }
+        //close(socket_servidor); // cerrar cuando empieza el juego
+        cout << socketfd_cliente << endl;
+        pthread_t cliente;
+        clientes.push_back(cliente);
+        pthread_mutex_lock(&mutex_clientes);
+        cant_clientes++;
+        pthread_mutex_unlock(&mutex_clientes);
+        pthread_create(&clientes[cant_clientes-1], NULL, atendedor_de_jugador, &socketfd_cliente);
     }
+  }
 
-    // inicializar ambos tableros, se accede como tablero[fila][columna]
-    tablero_equipo1 = vector<vector<char> >(alto);
-    for (unsigned int i = 0; i < alto; ++i) {
-        tablero_equipo1[i] = vector<char>(ancho, VACIO);
-    }
+  for(int i = 0; i < clientes.size(); i++){
+    pthread_join(clientes[i], NULL);
+  }
 
-    tablero_equipo2 = vector<vector<char> >(alto);
-    for (unsigned int i = 0; i < alto; ++i) {
-        tablero_equipo2[i] = vector<char>(ancho, VACIO);
-    }
-
-    int socketfd_cliente, socket_size;
-    struct sockaddr_in local, remoto;
-
-    // crear un socket de tipo INET con TCP (SOCK_STREAM)
-    if ((socket_servidor = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        cerr << "Error creando socket" << endl;
-    }
-
-    // permito reusar el socket para que no tire el error "Address Already in Use"
-    int flag = 1;
-    setsockopt(socket_servidor, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
-
-    // crear nombre, usamos INADDR_ANY para indicar que cualquiera puede conectarse aquí
-    local.sin_family = AF_INET;
-    local.sin_addr.s_addr = INADDR_ANY;
-    local.sin_port = htons(PORT);
-    if (bind(socket_servidor, (struct sockaddr *)&local, sizeof(local)) == -1) {
-        cerr << "Error haciendo bind!" << endl;
-        return 1;
-    }
-
-    // escuchar en el socket
-    if (listen(socket_servidor, 1) == -1) {
-        cerr << "Error escuchando socket!" << endl;
-        return 1;
-    }
-
-    // aceptar conexiones entrantes.
-    socket_size = sizeof(remoto);
-    while (true) {
-        if ((socketfd_cliente = accept(socket_servidor, (struct sockaddr*) &remoto, (socklen_t*) &socket_size)) == -1)
-            cerr << "Error al aceptar conexion" << endl;
-        else {
-            close(socket_servidor);
-            atendedor_de_jugador(socketfd_cliente);
-        }
-    }
-
-
-    return 0;
+  return 0;
 }
 
 
-void atendedor_de_jugador(int socket_fd) {
+void* atendedor_de_jugador(void* p_socket_fd) {
+    int socket_fd = *((int*) p_socket_fd);
     // variables locales del jugador
     char nombre_equipo[21];
 
@@ -115,17 +129,38 @@ void atendedor_de_jugador(int socket_fd) {
     if (recibir_nombre_equipo(socket_fd, nombre_equipo) != 0) {
         // el cliente cortó la comunicación, o hubo un error. Cerramos todo.
         terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1);
+        return NULL;
     }
 
     if (enviar_dimensiones(socket_fd) != 0) {
         // se produjo un error al enviar. Cerramos todo.
         terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1);
+        return NULL;
     }
 
     cout << "Esperando que juegue " << nombre_equipo << endl;
 
-    //Hay un solo equipo, soy siempre el equipo1
-    bool soy_equipo_1 = true;
+    bool soy_equipo_1;
+    if(nombre_equipo1 == "") {
+      nombre_equipo1 = nombre_equipo;
+      soy_equipo_1 = true;
+    } 
+    else if(nombre_equipo1 == nombre_equipo) {
+      soy_equipo_1 = true;
+    }
+    else if(nombre_equipo2 == "") {
+      nombre_equipo2 = nombre_equipo;
+      soy_equipo_1 = false;
+    }
+    else if(nombre_equipo2 == nombre_equipo) {
+      soy_equipo_1 = false;
+    }
+    else{
+      //Flasheaste cualca lince de la estepa rusa, troesma intergalactico federal.
+      //+10, reportado, a favorito.
+      terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1);
+      return NULL;
+    }
 
     vector<vector<char> > *tablero_jugador;
     vector<vector<char> > *tablero_rival;
@@ -153,6 +188,7 @@ void atendedor_de_jugador(int socket_fd) {
                 if (enviar_error(socket_fd) != 0) {
                     // se produjo un error al enviar. Cerramos todo.
                     terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                    return NULL;
                 }
 
                 continue;
@@ -172,6 +208,7 @@ void atendedor_de_jugador(int socket_fd) {
                 if (enviar_ok(socket_fd) != 0) {
                     // se produjo un error al enviar. Cerramos todo.
                     terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                    return NULL;
                 }
             }
             else {
@@ -181,6 +218,7 @@ void atendedor_de_jugador(int socket_fd) {
                 if (enviar_error(socket_fd) != 0) {
                     // se produjo un error al enviar. Cerramos todo.
                     terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                    return NULL;
                 }
             }
         }
@@ -193,13 +231,15 @@ void atendedor_de_jugador(int socket_fd) {
                 if (enviar_error(socket_fd) != 0) {
                     // se produjo un error al enviar. Cerramos todo.
                     terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                    return NULL;
                 }
 
             }else{
                 // Estamos listos para la pelea
                 peleando = true;
                 if (enviar_ok(socket_fd) != 0)
-                    terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                  terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                  return NULL;
             }
 
         }
@@ -211,6 +251,7 @@ void atendedor_de_jugador(int socket_fd) {
                 if (enviar_error(socket_fd) != 0) {
                     // se produjo un error al enviar. Cerramos todo.
                     terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                    return NULL;
                 }
 
                 continue;
@@ -226,6 +267,7 @@ void atendedor_de_jugador(int socket_fd) {
             if (enviar_ok(socket_fd) != 0) {
                 // se produjo un error al enviar. Cerramos todo.
                 terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                return NULL;
             }
         }
         else if (comando == MSG_BOMBA) {
@@ -251,6 +293,7 @@ void atendedor_de_jugador(int socket_fd) {
                     if (enviar_golpe(socket_fd) != 0) {
                         // se produjo un error al enviar. Cerramos todo.
                         terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                        return NULL;
                     }
 
                 }else if(contenido == BOMBA){
@@ -258,12 +301,14 @@ void atendedor_de_jugador(int socket_fd) {
                     if (enviar_estaba_golpeado(socket_fd) != 0) {
                         // se produjo un error al enviar. Cerramos todo.
                         terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                        return NULL;
                     }
                 }else{
                     // OK
                     if (enviar_ok(socket_fd) != 0) {
                         // se produjo un error al enviar. Cerramos todo.
                         terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                        return NULL;
                     }
                 }
             }
@@ -272,6 +317,7 @@ void atendedor_de_jugador(int socket_fd) {
                 if (enviar_error(socket_fd) != 0) {
                     // se produjo un error al enviar. Cerramos todo.
                     terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                    return NULL;
                 }
             }
 
@@ -280,6 +326,7 @@ void atendedor_de_jugador(int socket_fd) {
             if (enviar_tablero(socket_fd) != 0) {
                 // se produjo un error al enviar. Cerramos todo.
                 terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+                return NULL;
             }
         }
         else if (comando == MSG_INVALID) {
@@ -289,8 +336,11 @@ void atendedor_de_jugador(int socket_fd) {
         else {
             // se produjo un error al recibir. Cerramos todo.
             terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+            return NULL;
         }
     }
+
+    return NULL; //Lo agregue yo
 }
 
 
@@ -471,8 +521,6 @@ void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, 
     close(socket_fd);
 
     quitar_partes_barco(barco_actual, tablero_cliente);
-
-    exit(-1);
 }
 
 

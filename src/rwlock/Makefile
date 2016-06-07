@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -g -Wall -Werror
+CFLAGS = -g -Wall -Werror --std=c++11
 LDFLAGS = -pthread
 
 BINARIES = RWLockTest

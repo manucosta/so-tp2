@@ -1,15 +1,18 @@
-#ifndef Backend_mono_h
-#define Backend_mono_h
+#ifndef Backend_multi_h
+#define Backend_multi_h
 
 
 #include "Encabezado.h"
 #include "Casillero.h"
 #include "Enviar_recibir.h"
+#include <vector>
+#include "../rwlock/RWLock.h"
+#include <string>
 
 using namespace std;
 bool cargar_int(const char* numero, unsigned int& n);
 
-void atendedor_de_jugador(int socket_fd);
+void* atendedor_de_jugador(void* p_socket_fd);
 
 
 // mensajes recibidos por el server
