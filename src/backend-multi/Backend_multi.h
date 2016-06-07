@@ -24,7 +24,7 @@ int parsear_bomba(char* mensaje, Casillero& ficha);
 
 // mensajes enviados por el server
 int enviar_dimensiones(int socket_fd);
-int enviar_tablero(int socket_fd);
+int enviar_tablero(int socket_fd, bool equipo1);
 int enviar_ok(int socket_fd);
 int enviar_error(int socket_fd);
 int enviar_golpe(int socket_fd);

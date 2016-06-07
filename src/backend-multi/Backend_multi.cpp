@@ -15,7 +15,8 @@ unsigned int ancho = -1;
 unsigned int alto = -1;
 
 //Agregado por nosotros
-vector<vector<RWLock>> mutex_casillero;
+vector<vector<RWLock>> mutex_casillero_equipo1;
+vector<vector<RWLock>> mutex_casillero_equipo2;
 vector<pthread_t> clientes;
 int cant_clientes = 0;
 pthread_mutex_t mutex_clientes;
@@ -23,7 +24,6 @@ string nombre_equipo1 = "";
 string nombre_equipo2 = "";
 pthread_mutex_t mutex_equipos;
 pthread_cond_t cv;
-// FALTA: DIFERENCIAR ENTRE EQUIPO 1 Y EQUIPO 2
 
 bool cargar_int(const char* numero, unsigned int& n) {
 	char *eptr;
@@ -201,6 +201,9 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 			// ficha contiene el nuevo barco a colocar
 			// verificar si es una posición válida del tablero
+
+            //aca abría que usar el mutex
+
 			if (es_ficha_valida(ficha, barco_actual, *tablero_jugador)) {
 				barco_actual.push_back(ficha);
 				(*tablero_jugador)[ficha.fila][ficha.columna] = ficha.contenido;
@@ -237,15 +240,15 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			}else{
 				// Estamos listos para la pelea
 				pthread_mutex_lock(&mutex_clientes);
-        cant_clientes--;
-        if(cant_clientes == 0){
-          pthread_cond_broadcast(&cv);
-        }
-        while(cant_clientes != 0){
-				  pthread_cond_wait(&cv, &mutex_clientes);
-        }
-        peleando = true;
-        pthread_mutex_unlock(&mutex_clientes);
+                cant_clientes--;
+                if(cant_clientes == 0){
+                  pthread_cond_broadcast(&cv);
+                }
+                while(cant_clientes != 0){
+                          pthread_cond_wait(&cv, &mutex_clientes);
+                }
+                peleando = true;
+                pthread_mutex_unlock(&mutex_clientes);
 				if (enviar_ok(socket_fd) != 0)
 				  terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
 				  return NULL;
@@ -267,6 +270,9 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			}
 
 			// las partes acumuladas conforman un barco completo, escribirlas en el tablero del jugador y borrar las partes temporales
+
+            //aca abría que usar el mutex
+
 			for (list<Casillero>::const_iterator casillero = barco_actual.begin(); casillero != barco_actual.end(); casillero++) {
 				(*tablero_jugador)[casillero->fila][casillero->columna] = casillero->contenido;
 			}
@@ -332,7 +338,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 		}
 		else if (comando == MSG_UPDATE) {
-			if (enviar_tablero(socket_fd) != 0) {
+			if (enviar_tablero(socket_fd, soy_equipo_1) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
 				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
 				return NULL;
@@ -448,7 +454,7 @@ int enviar_dimensiones(int socket_fd) {
 	return enviar(socket_fd, buf);
 }
 
-int enviar_tablero(int socket_fd) {
+int enviar_tablero(int socket_fd, bool equipo1) {
 	char buf[MENSAJE_MAXIMO+1];
 	int pos;
 	vector<vector<char> > *tablero;
@@ -457,12 +463,20 @@ int enviar_tablero(int socket_fd) {
 	//Si no estoy peleando, muestro los barcos de mi equipo
 	if(!peleando){
 		sprintf(buf, "BARCOS ");
-		tablero = &tablero_equipo1;
-		pos = 7;
+        if(equipo1){
+            tablero = &tablero_equipo1;
+		}else{
+            tablero = &tablero_equipo2;
+        }
+        pos = 7;
 	}else{
 	//Sino muestro los resultados de la batalla
 		sprintf(buf, "BATALLA ");
-		tablero = &tablero_equipo2;
+		if(equipo1){
+            tablero = &tablero_equipo2;
+		}else{
+            tablero = &tablero_equipo1;
+        }
 		pos = 8;
 	}
 
