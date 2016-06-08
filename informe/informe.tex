@@ -1,0 +1,93 @@
+\documentclass[hidelinks,a4paper,12pt, nofootinbib]{article}
+\usepackage[width=15.5cm, left=3cm, top=2.5cm, right=2cm, left=2cm, height= 24.5cm]{geometry}
+\usepackage[spanish, es-tabla]{babel} %es-tabla es para que ponga Tabla en vez de Cuadro en el caption
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{xspace}
+\usepackage{xargs}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{caratula}
+\usepackage[bottom]{footmisc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{array}
+\usepackage{xcolor,colortbl}
+\usepackage{amsthm}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{sidecap}
+\usepackage{wrapfig}
+\usepackage{caption}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks   = true, %Colours links instead of ugly boxes
+  urlcolor     = blue, %Colour for external hyperlinks
+  linkcolor    = blue, %Colour of internal links
+  citecolor   = red %Colour of citations
+}
+
+%%fancyhdr
+\pagestyle{fancy}
+\thispagestyle{fancy}
+\addtolength{\headheight}{1pt}
+\lhead{Sistemas Operativos: TP2}
+\rhead{$1º$ cuatrimestre de 2016}
+\cfoot{\thepage\ / \pageref{LastPage}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\labelitemi}{$\bullet$}
+
+\definecolor{LightCyan}{rgb}{0.77,0.9,0.9}
+
+% Datos de caratula
+\materia{Sistemas Operativos}
+\titulo{Trabajo Práctico 2}
+\subtitulo{Pthreads}
+\grupo{}
+
+\integrante{Costa, Manuel José Joaquin}{035/14}{manucos94@gmail.com}
+\integrante{Coy, Camila Paula}{033/14}{camicoy94@gmail.com}
+\integrante{Ginsberg, Mario Ezequiel}{145/14}{ezequielginsberg@gmail.com}
+
+\fecha{8 de Junio de 2016}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\subsection{Read-Write Look}
+Para implementar el \texttt{RWLook} utilizamos los siguientes atributos privados:
+\begin{itemize}
+	\item \texttt{mutex}
+	\item \texttt{cv\_write}: Una variable de condición para la variable \texttt{write}. 
+	\item \texttt{cv\_read}: Una variable de condición para la variable \texttt{cant\_reads}.
+	\item \texttt{cant\_reads}: Tiene la cantidad de lecturas que se estan realizando.
+	\item \texttt{write}: Un booleano que cuando llega un write se pone en true.
+\end{itemize}
+
+Además usamos los siguientes métodos públicos:
+\begin{itemize}
+	\item \texttt{RWLook()}: Inicializa el mutex, las variables de condición, \texttt{cant\_reads} y \texttt{write}.
+	\item \texttt{void rlock()}: Genera el look para los reads. Si lega un write deja esperando los reads para que no pueda haber inanición, luego aumenta \texttt{cant\_reads}, ya que hay alguien leyendo. 
+	\item \texttt{void unblock(int pid)}: Agrega el proceso con id \texttt{pid} en la cola de prioridad indicada por el contenido del subíndice pid de \texttt{unblock\_to}.
+	\item \texttt{int tick(int cpu, const enum Motivo m)}: Tiene tres casos según el motivo con el que se la haya llamado:
+	\begin{enumerate}
+		\item \texttt{Caso EXIT}: Simplemente llamamos a \texttt{next()} para que corra el siguiente proceso.
+		\item \texttt{Caso BLOCK}: Guardo en \texttt{unblock\_to} en la posición del id del proceso que se corre, la prioridad actual menos uno. Después se llama a \texttt{next()} para que pueda correr el siguiete proceso.
+		\item \texttt{TICK}: Pueden pasar varias cosas:
+		\begin{enumerate}
+			\item La tarea actual es \emph{idle}, en cuyo caso solo queda llamar a \texttt{next} y devolver su resultado.
+			\item La tarea actual no es \emph{idle} pero se acabó su \emph{quantum}, por lo que hay que encolarla en la siguiente cola con menor prioridad y llamamos a \texttt{next}.
+			\item La tarea actual ni es \emph{idle} ni terminó su \emph{quantum}, así que debe seguir ejecutando pero reducimos en 1 la cantidad de ciclos restantes.
+		\end{enumerate}
+	\end{enumerate}
+\end{itemize}
+\subsection{Servidor}
+
+
+
+\end{document}
