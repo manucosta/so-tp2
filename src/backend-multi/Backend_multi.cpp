@@ -15,15 +15,14 @@ unsigned int ancho = -1;
 unsigned int alto = -1;
 
 //Agregado por nosotros
-vector<vector<RWLock>> mutex_casillero_equipo1;
-vector<vector<RWLock>> mutex_casillero_equipo2;
-vector<pthread_t> clientes;
-int cant_clientes = 0;
-pthread_mutex_t mutex_clientes;
+vector<vector<RWLock>> mutex_casillero_equipo1; //Los RWLook para cada casillero del tablero del equipo 1
+vector<vector<RWLock>> mutex_casillero_equipo2; //Los RWLook para cada casillero del tablero del equipo 2
+vector<pthread_t> clientes; //vector de theread
+int cant_clientes = 0; //la cantidad de jugadores totales
+pthread_mutex_t mutex_clientes; //mutex para proteger cant_clientes
+pthread_mutex_t mutex_equipos; //mutex para proteger los nombres de los equipos
 string nombre_equipo1 = "";
 string nombre_equipo2 = "";
-pthread_mutex_t mutex_equipos;
-pthread_cond_t cv;
 
 bool cargar_int(const char* numero, unsigned int& n) {
 	char *eptr;
@@ -36,9 +35,9 @@ bool cargar_int(const char* numero, unsigned int& n) {
 }
 
 int main(int argc, const char* argv[]) {
+  //inicializamos los mutex.
   pthread_mutex_init(&mutex_clientes, NULL);
   pthread_mutex_init(&mutex_equipos, NULL);
-	pthread_cond_init(&cv, NULL);
 
   // manejo la señal SIGINT para poder cerrar el socket cuando cierra el programa
   signal(SIGINT, cerrar_servidor);
@@ -70,6 +69,8 @@ int main(int argc, const char* argv[]) {
   for (unsigned int i = 0; i < alto; ++i) {
 	  tablero_equipo2[i] = vector<char>(ancho, VACIO);
   }
+
+  //Inicializamos los RWLook de ambos tableros
   RWLock locksito;
   for(unsigned int i = 0; i < alto; i++){
   	vector<RWLock> vec;
@@ -110,20 +111,20 @@ int main(int argc, const char* argv[]) {
 
   // aceptar conexiones entrantes.
   socket_size = sizeof(remoto);
-  while (!peleando) {
+  while (!peleando) { //recibo jugadores mientras todavía estoy en la fase de crear barcos.
   	if ((socketfd_cliente = accept(socket_servidor, (struct sockaddr*) &remoto, (socklen_t*) &socket_size)) == -1)
   		cerr << "Error al aceptar conexion" << endl;
   	else {
-  		//close(socket_servidor); // cerrar cuando empieza el juego
-  		pthread_t cliente;
+  		pthread_t cliente; //Por cada nuevo jugador creamos un nuevo thread
   		pthread_mutex_lock(&mutex_clientes);
   		clientes.push_back(cliente);
   		cant_clientes++;
-  		pthread_create(&clientes[clientes.size()-1], NULL, atendedor_de_jugador, &socketfd_cliente);
+  		pthread_create(&clientes[clientes.size()-1], NULL, atendedor_de_jugador, &socketfd_cliente); //El nuevo thread empieza en el atendedor_de_jugador
   		pthread_mutex_unlock(&mutex_clientes);
   	}
   }
   close(socket_servidor);
+  //Espero a todos los threads para irme
   for(unsigned int i = 0; i < clientes.size(); i++){
     pthread_join(clientes[i], NULL);
   }
@@ -133,7 +134,7 @@ int main(int argc, const char* argv[]) {
 
 
 void* atendedor_de_jugador(void* p_socket_fd) {
-	bool listo = false;
+	bool listo = false; //Variable para indicar si el jugador ya esta listo para pelear o no
 	int socket_fd = *((int*) p_socket_fd);
 	// variables locales del jugador
 	char nombre_equipo[21];
@@ -144,38 +145,37 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	if (recibir_nombre_equipo(socket_fd, nombre_equipo) != 0) {
 		// el cliente cortó la comunicación, o hubo un error. Cerramos todo.
 		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
-		return NULL;
+		return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 	}
 
 	if (enviar_dimensiones(socket_fd) != 0) {
 		// se produjo un error al enviar. Cerramos todo.
 		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
-		return NULL;
+		return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 	}
 
-	cout << "Esperando que juegue " << nombre_equipo << endl;
-
-	bool soy_equipo_1;
-	if(nombre_equipo1 == "") {
+	bool soy_equipo_1; //variable para saber si soy equipo 1 o equipo 2
+	if(nombre_equipo1 == "") { //si equipo 1 no tiene nombre, creamos el equipo 1 con el nombre que introdujo el jugador
 	  nombre_equipo1 = nombre_equipo;
 	  soy_equipo_1 = true;
 	} 
-	else if(nombre_equipo1 == nombre_equipo) {
+	else if(nombre_equipo1 == nombre_equipo) { //soy equipo 1
 	  soy_equipo_1 = true;
 	}
-	else if(nombre_equipo2 == "") {
+	else if(nombre_equipo2 == "") { //no soy del equipo 1 y todavia no estaba creado el equipo 2. Así que los creo 
 	  nombre_equipo2 = nombre_equipo;
 	  soy_equipo_1 = false;
 	}
-	else if(nombre_equipo2 == nombre_equipo) {
+	else if(nombre_equipo2 == nombre_equipo) { //soy del equipo 2
 	  soy_equipo_1 = false;
 	}
-	else{
+	else{ //introduje un tercer nombre de equipo
 	  //Flasheaste cualca lince de la estepa rusa, troesma intergalactico federal.
 	  //+10, reportado, a favorito.
 	  terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
 	  return NULL;
 	}
+  cout << "Esperando que juegue " << nombre_equipo << endl;
 
 	vector<vector<char> > *tablero_jugador;
 	vector<vector<char> > *tablero_rival;
@@ -203,7 +203,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-					return NULL;
+					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 
 				continue;
@@ -219,13 +219,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 			if (es_ficha_valida(ficha, barco_actual, *tablero_jugador, soy_equipo_1)) {
 				barco_actual.push_back(ficha);
-				
-				if (enviar_ok(socket_fd) != 0) {
-					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-					return NULL;
-				}
-
+        //agrego al tablero una b para diferenciar las artes de barcos de los barcos terminados.
 				if(soy_equipo_1){
 					mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
 					(*tablero_jugador)[ficha.fila][ficha.columna] = 'b';
@@ -235,6 +229,12 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 					(*tablero_jugador)[ficha.fila][ficha.columna] = 'b';
 					mutex_casillero_equipo2[ficha.fila][ficha.columna].wunlock();
 				}
+
+        if (enviar_ok(socket_fd) != 0) {
+					// se produjo un error al enviar. Cerramos todo.
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+				}
 				// OK
 			}
 			else {
@@ -242,7 +242,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-					return NULL;
+					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				quitar_partes_barco(barco_actual, *tablero_jugador, soy_equipo_1);
 			}
@@ -252,7 +252,6 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 			//Si ya había terminado, enviar error
 			if(listo){
-
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
@@ -262,32 +261,31 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			}else{
 				// Estamos listos para la pelea
 
-				if (enviar_ok(socket_fd) != 0){
-				 	terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-				 	return NULL;
-				}
-
 				pthread_mutex_lock(&mutex_clientes);
-        cant_clientes--;
-        listo = true;
-        if(cant_clientes == 0){
+        cant_clientes--; //Hay un jugador menos en la fase de crear barcos
+        listo = true; //El jugador ya termino de poner sus barcos
+        if(cant_clientes == 0){ //si soy el ultimo en salir de la fase de crear barcos pongo la variable global en true
         	peleando = true;
         }
         pthread_mutex_unlock(&mutex_clientes);
+
+				if (enviar_ok(socket_fd) != 0){
+				 	terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+				 	return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+				}
 			}
 
 		}
 		else if (comando == MSG_BARCO_TERMINADO) {
 
 
-			//Si estoy peleando, no acepto barcos ya
+			//Si estoy listo para pelear, no acepto barcos ya
 			if(listo){
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-					return NULL;
+					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
-
 				continue;
 			}
 
@@ -308,13 +306,12 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if (enviar_ok(socket_fd) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
 				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-				return NULL;
+				return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 			}
 			
 			barco_actual.clear();
 		}
 		else if (comando == MSG_BOMBA) {
-			//TODO
 
 			Casillero ficha;
 			if (parsear_bomba(mensaje, ficha) != 0) {
@@ -327,33 +324,33 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if (peleando && ficha.fila <= alto - 1 && ficha.columna <= ancho - 1) {
 
 				//Si había un BARCO, pongo una BOMBA
-				char contenido;
+				char contenido; //leo para ver que hay en esa posicion
 				if(soy_equipo_1){
 		      mutex_casillero_equipo1[ficha.fila][ficha.columna].rlock();
 		      contenido = (*tablero_rival)[ficha.fila][ficha.columna];
 		      mutex_casillero_equipo1[ficha.fila][ficha.columna].runlock();
+          if(contenido == BARCO){
+            //es un barco => pongo una bomba
+            mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
+			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
+			      mutex_casillero_equipo1[ficha.fila][ficha.columna].wunlock();
+          }
 				}else{
 					mutex_casillero_equipo2[ficha.fila][ficha.columna].rlock();
 		      contenido = (*tablero_rival)[ficha.fila][ficha.columna];
 		      mutex_casillero_equipo2[ficha.fila][ficha.columna].runlock();
-				}
-
-				if(contenido == BARCO){
-
-					if(soy_equipo_1){
-			      mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
-			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
-			      mutex_casillero_equipo1[ficha.fila][ficha.columna].wunlock();
-					}else{
-						mutex_casillero_equipo2[ficha.fila][ficha.columna].wlock();
+          if(contenido == BARCO){
+            //es un barco => pongo una bomba
+            mutex_casillero_equipo2[ficha.fila][ficha.columna].wlock();
 			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
 			      mutex_casillero_equipo2[ficha.fila][ficha.columna].wunlock();
-					}
-
+          }
+				}
+        if(contenido == BARCO){
 					if (enviar_golpe(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
 						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-						return NULL;
+						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 
 				}else if(contenido == BOMBA){
@@ -361,23 +358,22 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 					if (enviar_estaba_golpeado(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
 						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-						return NULL;
+						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 				}else{
 					// OK
 					if (enviar_ok(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
 						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-						return NULL;
+						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 				}
-			}
-			else {
+			}else {
 				// ERROR
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-					return NULL;
+					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 			}
 
@@ -386,7 +382,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if (enviar_tablero(socket_fd, soy_equipo_1) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
 				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-				return NULL;
+				return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 			}
 		}
 		else if (comando == MSG_INVALID) {
@@ -396,11 +392,9 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 		else {
 			// se produjo un error al recibir. Cerramos todo.
 			terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
-			return NULL;
+			return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 		}
 	}
-
-	return NULL; //Lo agregue yo
 }
 
 
@@ -527,6 +521,7 @@ int enviar_tablero(int socket_fd, bool equipo1) {
 	for (unsigned int fila = 0; fila < alto; ++fila) {
 		for (unsigned int col = 0; col < ancho; ++col) {
 			char contenido;
+      //leo el contenido de cada casillero del tablero
 			if(equipo1){
 	      mutex_casillero_equipo1[fila][col].rlock();
 	      contenido = (*tablero)[fila][col];
@@ -539,15 +534,15 @@ int enviar_tablero(int socket_fd, bool equipo1) {
 			switch(contenido){
 				case VACIO:
 				  buf[pos] = '-';
-				  break; //optional
+				  break;
 				case BARCO:
 				  //si estoy peleando, oculto los barcos. Sino, los muestro
 				  buf[pos] = peleando ? '-' : 'B';
-				  break; //optional
+				  break;
 				case BOMBA:
 					buf[pos] = '*';
 					break;
-				case 'b':
+				case 'b': //si es un barco no terminado lo oculto
 					buf[pos] = '-';
 			}
 
@@ -596,15 +591,17 @@ void cerrar_servidor(int signal) {
 void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo) {
 
 	cout << "Se interrumpió la comunicación con un cliente" << endl;
-
+  pthread_mutex_lock(&mutex_clientes);
+  cant_clientes--;
+  pthread_mutex_unlock(&mutex_clientes);
 	close(socket_fd);
-
 	quitar_partes_barco(barco_actual, tablero_cliente, equipo);
 }
 
 
 void quitar_partes_barco(list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo) {
 	for (list<Casillero>::const_iterator casillero = barco_actual.begin(); casillero != barco_actual.end(); casillero++) {
+    //pasamos por cada lugar de barco actual poniendo VACIO en vez de b
 		if(equipo){
 			mutex_casillero_equipo1[casillero->fila][casillero->columna].wlock();
 			tablero_cliente[casillero->fila][casillero->columna] = VACIO;
@@ -626,7 +623,7 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 		return false;
 	}
 
-	// si el casillero está ocupado, tampoco es válida
+	// Leo el casillero, si está ocupado, tampoco es válida
 	if(equipo){
 		mutex_casillero_equipo1[ficha.fila][ficha.columna].rlock();
 		if (tablero[ficha.fila][ficha.columna] != VACIO) {

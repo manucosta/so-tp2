@@ -16,7 +16,7 @@ class RWLock {
     private:
     	pthread_mutex_t mutex;
     	pthread_cond_t cv_write, cv_read;
-    	bool write;
+    	bool write;	//avisa si llego una escritura
     	int cant_reads; // Guarda la cantidad de "gente" leyendo.
 };
 
