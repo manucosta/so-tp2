@@ -36,6 +36,10 @@ bool cargar_int(const char* numero, unsigned int& n) {
 }
 
 int main(int argc, const char* argv[]) {
+  pthread_mutex_init(&mutex_clientes, NULL);
+  pthread_mutex_init(&mutex_equipos, NULL);
+	pthread_cond_init(&cv, NULL);
+
   // manejo la señal SIGINT para poder cerrar el socket cuando cierra el programa
   signal(SIGINT, cerrar_servidor);
 
@@ -65,6 +69,16 @@ int main(int argc, const char* argv[]) {
   tablero_equipo2 = vector<vector<char> >(alto);
   for (unsigned int i = 0; i < alto; ++i) {
 	  tablero_equipo2[i] = vector<char>(ancho, VACIO);
+  }
+  RWLock locksito;
+  for(unsigned int i = 0; i < alto; i++){
+  	vector<RWLock> vec;
+  	mutex_casillero_equipo1.push_back(vec);
+  	mutex_casillero_equipo2.push_back(vec);
+  	for(unsigned int j = 0; j < ancho; j++){
+  		mutex_casillero_equipo1[i].push_back(locksito);
+  		mutex_casillero_equipo2[i].push_back(locksito);
+  	}
   }
 
   int socketfd_cliente, socket_size;
@@ -102,11 +116,11 @@ int main(int argc, const char* argv[]) {
   	else {
   		//close(socket_servidor); // cerrar cuando empieza el juego
   		pthread_t cliente;
-  		clientes.push_back(cliente);
   		pthread_mutex_lock(&mutex_clientes);
+  		clientes.push_back(cliente);
   		cant_clientes++;
+  		pthread_create(&clientes[clientes.size()-1], NULL, atendedor_de_jugador, &socketfd_cliente);
   		pthread_mutex_unlock(&mutex_clientes);
-  		pthread_create(&clientes[cant_clientes-1], NULL, atendedor_de_jugador, &socketfd_cliente);
   	}
   }
   close(socket_servidor);
@@ -119,6 +133,7 @@ int main(int argc, const char* argv[]) {
 
 
 void* atendedor_de_jugador(void* p_socket_fd) {
+	bool listo = false;
 	int socket_fd = *((int*) p_socket_fd);
 	// variables locales del jugador
 	char nombre_equipo[21];
@@ -128,13 +143,13 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 	if (recibir_nombre_equipo(socket_fd, nombre_equipo) != 0) {
 		// el cliente cortó la comunicación, o hubo un error. Cerramos todo.
-		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1);
+		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
 		return NULL;
 	}
 
 	if (enviar_dimensiones(socket_fd) != 0) {
 		// se produjo un error al enviar. Cerramos todo.
-		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1);
+		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
 		return NULL;
 	}
 
@@ -158,7 +173,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	else{
 	  //Flasheaste cualca lince de la estepa rusa, troesma intergalactico federal.
 	  //+10, reportado, a favorito.
-	  terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1);
+	  terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
 	  return NULL;
 	}
 
@@ -184,10 +199,10 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			Casillero ficha;
 
 			//Si estoy peleando, no acepto barcos ya
-			if(peleando){
+			if(listo){
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 					return NULL;
 				}
 
@@ -202,56 +217,63 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			// ficha contiene el nuevo barco a colocar
 			// verificar si es una posición válida del tablero
 
-            //aca abría que usar el mutex
-
-			if (es_ficha_valida(ficha, barco_actual, *tablero_jugador)) {
+			if (es_ficha_valida(ficha, barco_actual, *tablero_jugador, soy_equipo_1)) {
 				barco_actual.push_back(ficha);
-				(*tablero_jugador)[ficha.fila][ficha.columna] = ficha.contenido;
-				// OK
+				
 				if (enviar_ok(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 					return NULL;
 				}
+
+				if(soy_equipo_1){
+					mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
+					(*tablero_jugador)[ficha.fila][ficha.columna] = 'b';
+					mutex_casillero_equipo1[ficha.fila][ficha.columna].wunlock();
+				}else{
+					mutex_casillero_equipo2[ficha.fila][ficha.columna].wlock();
+					(*tablero_jugador)[ficha.fila][ficha.columna] = 'b';
+					mutex_casillero_equipo2[ficha.fila][ficha.columna].wunlock();
+				}
+				// OK
 			}
 			else {
 				// ERROR
-				quitar_partes_barco(barco_actual, *tablero_jugador);
-
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 					return NULL;
 				}
+				quitar_partes_barco(barco_actual, *tablero_jugador, soy_equipo_1);
 			}
 		}
 		else if (comando == MSG_LISTO) {
 			// El único cliente terminó de ubicar sus barcos
 
 			//Si ya había terminado, enviar error
-			if(peleando){
+			if(listo){
 
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 					return NULL;
 				}
 
 			}else{
 				// Estamos listos para la pelea
+
+				if (enviar_ok(socket_fd) != 0){
+				 	terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+				 	return NULL;
+				}
+
 				pthread_mutex_lock(&mutex_clientes);
-                cant_clientes--;
-                if(cant_clientes == 0){
-                  pthread_cond_broadcast(&cv);
-                }
-                while(cant_clientes != 0){
-                          pthread_cond_wait(&cv, &mutex_clientes);
-                }
-                peleando = true;
-                pthread_mutex_unlock(&mutex_clientes);
-				if (enviar_ok(socket_fd) != 0)
-				  terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
-				  return NULL;
+        cant_clientes--;
+        listo = true;
+        if(cant_clientes == 0){
+        	peleando = true;
+        }
+        pthread_mutex_unlock(&mutex_clientes);
 			}
 
 		}
@@ -259,10 +281,10 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 
 			//Si estoy peleando, no acepto barcos ya
-			if(peleando){
+			if(listo){
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 					return NULL;
 				}
 
@@ -271,19 +293,25 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 			// las partes acumuladas conforman un barco completo, escribirlas en el tablero del jugador y borrar las partes temporales
 
-            //aca abría que usar el mutex
-
 			for (list<Casillero>::const_iterator casillero = barco_actual.begin(); casillero != barco_actual.end(); casillero++) {
-				(*tablero_jugador)[casillero->fila][casillero->columna] = casillero->contenido;
+				if(soy_equipo_1) {
+	      	mutex_casillero_equipo1[casillero->fila][casillero->columna].wlock();
+					(*tablero_jugador)[casillero->fila][casillero->columna] = casillero->contenido;
+	      	mutex_casillero_equipo1[casillero->fila][casillero->columna].wunlock();
+	      } else {
+	      	mutex_casillero_equipo2[casillero->fila][casillero->columna].wlock();
+					(*tablero_jugador)[casillero->fila][casillero->columna] = casillero->contenido;
+	      	mutex_casillero_equipo2[casillero->fila][casillero->columna].wunlock();
+	      }
 			}
-
-			barco_actual.clear();
 
 			if (enviar_ok(socket_fd) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
-				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 				return NULL;
 			}
+			
+			barco_actual.clear();
 		}
 		else if (comando == MSG_BOMBA) {
 			//TODO
@@ -299,15 +327,32 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if (peleando && ficha.fila <= alto - 1 && ficha.columna <= ancho - 1) {
 
 				//Si había un BARCO, pongo una BOMBA
-				char contenido = (*tablero_rival)[ficha.fila][ficha.columna];
+				char contenido;
+				if(soy_equipo_1){
+		      mutex_casillero_equipo1[ficha.fila][ficha.columna].rlock();
+		      contenido = (*tablero_rival)[ficha.fila][ficha.columna];
+		      mutex_casillero_equipo1[ficha.fila][ficha.columna].runlock();
+				}else{
+					mutex_casillero_equipo2[ficha.fila][ficha.columna].rlock();
+		      contenido = (*tablero_rival)[ficha.fila][ficha.columna];
+		      mutex_casillero_equipo2[ficha.fila][ficha.columna].runlock();
+				}
 
 				if(contenido == BARCO){
 
-					(*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
+					if(soy_equipo_1){
+			      mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
+			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
+			      mutex_casillero_equipo1[ficha.fila][ficha.columna].wunlock();
+					}else{
+						mutex_casillero_equipo2[ficha.fila][ficha.columna].wlock();
+			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
+			      mutex_casillero_equipo2[ficha.fila][ficha.columna].wunlock();
+					}
 
 					if (enviar_golpe(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
-						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 						return NULL;
 					}
 
@@ -315,14 +360,14 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 					// OK
 					if (enviar_estaba_golpeado(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
-						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 						return NULL;
 					}
 				}else{
 					// OK
 					if (enviar_ok(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
-						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 						return NULL;
 					}
 				}
@@ -331,7 +376,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				// ERROR
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 					return NULL;
 				}
 			}
@@ -340,7 +385,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 		else if (comando == MSG_UPDATE) {
 			if (enviar_tablero(socket_fd, soy_equipo_1) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
-				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 				return NULL;
 			}
 		}
@@ -350,7 +395,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 		}
 		else {
 			// se produjo un error al recibir. Cerramos todo.
-			terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador);
+			terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
 			return NULL;
 		}
 	}
@@ -459,16 +504,15 @@ int enviar_tablero(int socket_fd, bool equipo1) {
 	int pos;
 	vector<vector<char> > *tablero;
 
-
 	//Si no estoy peleando, muestro los barcos de mi equipo
 	if(!peleando){
 		sprintf(buf, "BARCOS ");
-        if(equipo1){
-            tablero = &tablero_equipo1;
+    if(equipo1){
+      tablero = &tablero_equipo1;
 		}else{
-            tablero = &tablero_equipo2;
-        }
-        pos = 7;
+      tablero = &tablero_equipo2;
+    }
+    pos = 7;
 	}else{
 	//Sino muestro los resultados de la batalla
 		sprintf(buf, "BATALLA ");
@@ -482,17 +526,29 @@ int enviar_tablero(int socket_fd, bool equipo1) {
 
 	for (unsigned int fila = 0; fila < alto; ++fila) {
 		for (unsigned int col = 0; col < ancho; ++col) {
-			char contenido = (*tablero)[fila][col];
+			char contenido;
+			if(equipo1){
+	      mutex_casillero_equipo1[fila][col].rlock();
+	      contenido = (*tablero)[fila][col];
+	      mutex_casillero_equipo1[fila][col].runlock();
+			}else{
+	      mutex_casillero_equipo2[fila][col].rlock();
+	      contenido = (*tablero)[fila][col];
+	      mutex_casillero_equipo2[fila][col].runlock();
+	    }
 			switch(contenido){
 				case VACIO:
-				   buf[pos] = '-';
-				   break; //optional
+				  buf[pos] = '-';
+				  break; //optional
 				case BARCO:
-				   //si estoy peleando, oculto los barcos. Sino, los muestro
-				   buf[pos] = peleando ? '-' : 'B';
-				   break; //optional
+				  //si estoy peleando, oculto los barcos. Sino, los muestro
+				  buf[pos] = peleando ? '-' : 'B';
+				  break; //optional
 				case BOMBA:
 					buf[pos] = '*';
+					break;
+				case 'b':
+					buf[pos] = '-';
 			}
 
 			pos++;
@@ -537,25 +593,33 @@ void cerrar_servidor(int signal) {
 	exit(EXIT_SUCCESS);
 }
 
-void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente) {
+void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo) {
 
 	cout << "Se interrumpió la comunicación con un cliente" << endl;
 
 	close(socket_fd);
 
-	quitar_partes_barco(barco_actual, tablero_cliente);
+	quitar_partes_barco(barco_actual, tablero_cliente, equipo);
 }
 
 
-void quitar_partes_barco(list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente) {
+void quitar_partes_barco(list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo) {
 	for (list<Casillero>::const_iterator casillero = barco_actual.begin(); casillero != barco_actual.end(); casillero++) {
-		tablero_cliente[casillero->fila][casillero->columna] = VACIO;
+		if(equipo){
+			mutex_casillero_equipo1[casillero->fila][casillero->columna].wlock();
+			tablero_cliente[casillero->fila][casillero->columna] = VACIO;
+			mutex_casillero_equipo1[casillero->fila][casillero->columna].wunlock();
+		}else{
+			mutex_casillero_equipo2[casillero->fila][casillero->columna].wlock();
+			tablero_cliente[casillero->fila][casillero->columna] = VACIO;
+			mutex_casillero_equipo2[casillero->fila][casillero->columna].wunlock();
+		}
 	}
 	barco_actual.clear();
 }
 
 
-bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual, const vector<vector<char> >& tablero) {
+bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual, const vector<vector<char> >& tablero, bool equipo) {
 
 	// si está fuera del tablero, no es válida
 	if (ficha.fila > alto - 1 || ficha.columna > ancho - 1) {
@@ -563,8 +627,18 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 	}
 
 	// si el casillero está ocupado, tampoco es válida
-	if (tablero[ficha.fila][ficha.columna] != VACIO) {
-		return false;
+	if(equipo){
+		mutex_casillero_equipo1[ficha.fila][ficha.columna].rlock();
+		if (tablero[ficha.fila][ficha.columna] != VACIO) {
+			return false;
+		}
+		mutex_casillero_equipo1[ficha.fila][ficha.columna].runlock();
+	}else{
+		mutex_casillero_equipo2[ficha.fila][ficha.columna].rlock();
+		if (tablero[ficha.fila][ficha.columna] != VACIO) {
+			return false;
+		}
+		mutex_casillero_equipo2[ficha.fila][ficha.columna].runlock();
 	}
 
 	if (barco_actual.size() > 0) {
@@ -585,9 +659,20 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 			int paso = distancia_horizontal / abs(distancia_horizontal);
 			for (unsigned int columna = mas_distante.columna; columna != ficha.columna; columna += paso) {
 				// el casillero DEBE estar ocupado en el tablero
-				if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
-					return false;
+				if(equipo){
+					mutex_casillero_equipo1[ficha.fila][columna].rlock();
+					if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
+						return false;
+					}
+					mutex_casillero_equipo1[ficha.fila][columna].runlock();
+				}else{
+					mutex_casillero_equipo2[ficha.fila][columna].rlock();
+					if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
+						return false;
+					}
+					mutex_casillero_equipo2[ficha.fila][columna].runlock();
 				}
+				
 			}
 
 		} else if (distancia_horizontal == 0) {
@@ -602,8 +687,18 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 			int paso = distancia_vertical / abs(distancia_vertical);
 			for (unsigned int fila = mas_distante.fila; fila != ficha.fila; fila += paso) {
 				// el casillero DEBE estar ocupado en el tablero
-				if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
-					return false;
+				if(equipo){
+					mutex_casillero_equipo1[fila][ficha.columna].rlock();
+					if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
+						return false;
+					}
+					mutex_casillero_equipo1[fila][ficha.columna].runlock();
+				}else{
+					mutex_casillero_equipo2[fila][ficha.columna].rlock();
+					if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
+						return false;
+					}
+					mutex_casillero_equipo2[fila][ficha.columna].runlock();
 				}
 			}
 		}
