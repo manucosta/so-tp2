@@ -59,31 +59,24 @@
 \tableofcontents
 \newpage
 
-\subsection{Read-Write Look}
-Para implementar el \texttt{RWLook} utilizamos los siguientes atributos privados:
+\subsection{Read-Write Lock}
+Para implementar el \texttt{RWLock} utilizamos los siguientes atributos privados:
 \begin{itemize}
 	\item \texttt{mutex}
 	\item \texttt{cv\_write}: Una variable de condición para la variable \texttt{write}. 
 	\item \texttt{cv\_read}: Una variable de condición para la variable \texttt{cant\_reads}.
 	\item \texttt{cant\_reads}: Tiene la cantidad de lecturas que se estan realizando.
-	\item \texttt{write}: Un booleano que cuando llega un write se pone en true.
+	\item \texttt{write}: Un booleano que cuando llega un write se pone en true. Lo usamos para evitar que los threads que realizan reads le generen inanición a los threads que quieren hacer write.
 \end{itemize}
 
 Además usamos los siguientes métodos públicos:
 \begin{itemize}
-	\item \texttt{RWLook()}: Inicializa el mutex, las variables de condición, \texttt{cant\_reads} y \texttt{write}.
-	\item \texttt{void rlock()}: Genera el look para los reads. Si lega un write deja esperando los reads para que no pueda haber inanición, luego aumenta \texttt{cant\_reads}, ya que hay alguien leyendo. 
-	\item \texttt{void unblock(int pid)}: Agrega el proceso con id \texttt{pid} en la cola de prioridad indicada por el contenido del subíndice pid de \texttt{unblock\_to}.
-	\item \texttt{int tick(int cpu, const enum Motivo m)}: Tiene tres casos según el motivo con el que se la haya llamado:
-	\begin{enumerate}
-		\item \texttt{Caso EXIT}: Simplemente llamamos a \texttt{next()} para que corra el siguiente proceso.
-		\item \texttt{Caso BLOCK}: Guardo en \texttt{unblock\_to} en la posición del id del proceso que se corre, la prioridad actual menos uno. Después se llama a \texttt{next()} para que pueda correr el siguiete proceso.
-		\item \texttt{TICK}: Pueden pasar varias cosas:
-		\begin{enumerate}
-			\item La tarea actual es \emph{idle}, en cuyo caso solo queda llamar a \texttt{next} y devolver su resultado.
-			\item La tarea actual no es \emph{idle} pero se acabó su \emph{quantum}, por lo que hay que encolarla en la siguiente cola con menor prioridad y llamamos a \texttt{next}.
-			\item La tarea actual ni es \emph{idle} ni terminó su \emph{quantum}, así que debe seguir ejecutando pero reducimos en 1 la cantidad de ciclos restantes.
-		\end{enumerate}
+	\item \texttt{RWLock()}: Inicializa el mutex, las variables de condición, \texttt{cant\_reads} y \texttt{write}.
+	\item \texttt{void rlock()}: Genera el lock para los reads. Si llega un write deja esperando los reads para que no pueda haber inanición, luego aumenta \texttt{cant\_reads}, ya que hay alguien leyendo. 
+	\item \texttt{void runlock()}: Decrementa \texttt{cant\_reads} indicando que dejo de leer. Si después de eso \texttt{cant\_reads} = 0 entonces envía un broadcast a todos los threads que están esperando por la variable de condición \texttt{cv\_write}.
+	\item \texttt{void wlock()}: Genera el lock para los writes. Si llegan reads o writes, quedan bloqueados hasta que se haga el  \texttt{void wlock()}. Notar que lockea el \texttt{mutex} y no lo libera.
+	\item \texttt{void wunlock()}: 
+	}
 	\end{enumerate}
 \end{itemize}
 \subsection{Servidor}
