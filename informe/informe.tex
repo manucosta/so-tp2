@@ -96,9 +96,10 @@ Para testear el correcto funcionamiento de la clase RWLock hicimos dos tipos de 
 \end{itemize}
 
 \section{Servidor}
-Para el servidor nos basamos en \texttt{backend-mono}, haciendole los cambios necesarios para que pudo soportar más de un jugador. 
-Cada vez que acepta a un jugador crea un thread para atenderlo mediante la función \texttt{atenderdor\_de\_jugador} y guardamos la información del thread en un vector. Además creamos dos vectores de vectores de RWLock para proteger ambos tableros y todos los lugares donde en \texttt{backend-mono} se escribío o leyo algun tablero agregamos las protecciones de este.
-Para poder saber cuando todos los jugadores mandaron el mensaje de LISTO y poder pasar a la fase de batalla, creamos la variable \texttt{cant\_clientes} y la protegimos para que no la puedan modificar dos threads a la vez. Entonces cada vez que entra un cliente entra aumentamos en uno esta variable, y cada vez que un thread muere o un jugador dice LISTO esta decrementa.
+Para el servidor nos basamos en \texttt{backend-mono}, haciéndole los cambios necesarios para que pudo soportar más de un jugador. 
+
+Cada vez que acepta a un jugador crea un thread para atenderlo mediante la función \texttt{atenderdor\_de\_jugador} y guardamos la información del thread en un vector. Además creamos dos matrices de RWLock para proteger ambos tableros, y en todos los lugares donde en \texttt{backend-mono} se escribió o leyo algún casillero de algún tablero agregamos las protecciones correspondientes.
+Para poder saber cuando todos los jugadores mandaron el mensaje de LISTO y poder pasar a la fase de batalla, creamos la variable \texttt{cant\_clientes} y la protegimos para que no la puedan modificar dos threads a la vez. Entonces cada vez que entra un cliente entra aumentamos en uno esta variable, y cada vez que un thread muere o un jugador dice LISTO esta decrementa. Además ahora a parte de solo tener la variable global peleando, cada thread tiene una variable local \texttt{listo}, lo que evita que cuando un cliente pase a pelear todos los demás lo hagan.
 
 
 \end{document}

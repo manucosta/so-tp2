@@ -57,11 +57,11 @@ void* leer1(void *vargp) {
 void* escribir2(void *vargp) {
 	int id = *((int*) vargp);
 	RWmutex.wlock();
-	pthread_mutex_lock(&mutex);
-	cout << "Escribo: " << id << endl;
-	pthread_mutex_unlock(&mutex);
-	
-	sleep(0.5);
+		pthread_mutex_lock(&mutex);
+		cout << "Escribo: " << id << endl;
+		pthread_mutex_unlock(&mutex);
+		
+		sleep(0.5);
 	
 	RWmutex.wunlock();
 	return NULL;
@@ -70,11 +70,11 @@ void* escribir2(void *vargp) {
 void* leer2(void *vargp) {
 	int id = *((int*) vargp);
 	RWmutex.rlock();
-	pthread_mutex_lock(&mutex);
-		cout << "Leo: " << id << endl;
-	pthread_mutex_unlock(&mutex);
-	
-	sleep(0.5);
+		pthread_mutex_lock(&mutex);
+			cout << "Leo: " << id << endl;
+		pthread_mutex_unlock(&mutex);
+		
+		sleep(0.5);
 	
 	RWmutex.runlock();
 	return NULL;
@@ -113,15 +113,18 @@ void test2(int n) {
 	//Comprobamos que los threads de lectura no le produzcan
 	//inanición a los de escritura
 	cout << "### Inanición 1 ###" << endl;
-
+	
+	//Pongo la mitad de los threads a leer	
 	for(int i = 0; i < n/2; i++){
 		aux[i] = i;
 		pthread_create(&threads[i], NULL, leer2, &aux[i]);
 	}
-
+	
+	//Mando un thread a escribir, mientras otros están leyendo
 	aux[n/2] = n/2;
 	pthread_create(&threads[n/2], NULL, escribir2, &aux[n/2]);
-
+	
+	//Mando el resto de los thread a leer
 	for(int i = n/2 + 1; i < n; i++){
 		aux[i] = i;
 		pthread_create(&threads[i], NULL, leer2, &aux[i]);
@@ -135,14 +138,17 @@ void test2(int n) {
 	//inanición a los de lectura	
 	cout << "\n### Inanición 2 ###" << endl;
 
+	//Pongo la mitad de los threads a escribir
 	for(int i = 0; i < n/2; i++){
 		aux[i] = i;
 		pthread_create(&threads[i], NULL, escribir2, &aux[i]);
 	}
 
+	//Mando un thread a leer, mientras otros están escribiendo
 	aux[n/2] = n/2;
 	pthread_create(&threads[n/2], NULL, leer2, &aux[n/2]);
 
+	//Mando el resto de los thread a escribir
 	for(int i = n/2 + 1; i < n; i++){
 		aux[i] = i;
 		pthread_create(&threads[i], NULL, escribir2, &aux[i]);
@@ -155,7 +161,7 @@ void test2(int n) {
 
 int main(int argc, char const *argv[]) {
 	//argv[1] = tipo de test (1 o 2)
-	//argv[2] = cantidad de threads
+	//argv[2] = cantidad de threads que se quieren correr
 	if(argc != 3) {
 		cout << "ENTRADA INCORRECTA!" << endl;
 		cout << "El formato es ./RWLockTest <tipo> <#threads>, donde tipo puede ser 1 o 2" << endl;
