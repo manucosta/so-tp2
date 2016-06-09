@@ -80,7 +80,9 @@ Además usamos los siguientes métodos públicos:
 	\end{enumerate}
 \end{itemize}
 \subsection{Servidor}
-
+Para el servidor nos basamos en \texttt{backend-mono}, haciendole los cambios necesarios para que pudo soportar más de un jugador. 
+Cada vez que acepta a un jugador crea un thread para atenderlo mediante la función \texttt{atenderdor_de_jugador} y guardamos la información del thread en un vector. Además creamos dos vectores de vectores de RWLock para proteger ambos tableros y todos los lugares donde en \texttt{backend-mono} se escribío o leyo algun tablero agregamos las protecciones de este.
+Para poder saber cuando todos los jugadores mandaron el mensaje de LISTO y poder pasar a la fase de batalla, creamos la variable \texttt{cant\_clientes} y la protegimos para que no la puedan modificar dos threads a la vez. Entonces cada vez que entra un cliente entra aumentamos en uno esta variable, y cada vez que un thread muere o un jugador dice LISTO esta decrementa.
 
 
 \end{document}
