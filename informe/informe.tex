@@ -59,7 +59,7 @@
 \tableofcontents
 \newpage
 
-\subsection{Read-Write Lock}
+\section{Read-Write Lock}
 Para implementar el \texttt{RWLock} utilizamos los siguientes atributos privados:
 \begin{itemize}
 	\item \texttt{mutex}
@@ -75,9 +75,27 @@ Además usamos los siguientes métodos públicos:
 	\item \texttt{void rlock()}: Genera el lock para los reads. Si llega un write deja esperando los reads para que no pueda haber inanición, luego aumenta \texttt{cant\_reads}, ya que hay alguien leyendo. 
 	\item \texttt{void runlock()}: Decrementa \texttt{cant\_reads} indicando que dejo de leer. Si después de eso \texttt{cant\_reads} = 0 entonces envía un broadcast a todos los threads que están esperando por la variable de condición \texttt{cv\_write}.
 	\item \texttt{void wlock()}: Genera el lock para los writes. Si llegan reads o writes, quedan bloqueados hasta que se haga el  \texttt{void wlock()}. Notar que lockea el \texttt{mutex} y no lo libera.
-	\item \texttt{void wunlock()}: 
+	\item \texttt{void wunlock()}: Hace broadcast para la variable condicional de lectura y deslockea el \texttt{mutex}
 \end{itemize}
-\subsection{Servidor}
+
+\subsection{Test}
+Para testear el correcto funcionamiento de la clase RWLock hicimos dos tipos de test:
+
+\begin{itemize}
+  \item El test1 permite verificar que los lock tengan el comportamiento esperado. Esto es, que los lock de escritura impidan que se puedan realizar lecturas u otras escrituras, y que los locks de lectura no bloqueen a otros locks de lectura.
+  Para esto tenemos un par de variables \texttt{escribiendo} y \texttt{leyendo}: la primera es booleana e indica si alguien tomo el lock de escritura; la segunda  es un entero que indica cuantos threads están tomando locks de lectura. 
+
+  Al acceder a la sección crítica se realizan asserts que verifican que el estado de ambas variables sea consistente con lo esperable. Notar que es necesario proteger a ambas variables con mutex al leerlas o modificarlas debido a la concurrencia. Tanto la función de escritura como la de lectura gastan un tiempo fijo de tiempo durmiendo. La función de lectura adicionalmente imprime la cantidad de procesos leyendo en simultáneo. Esto es útil para ver que efectivamente el lock de lectura no es bloqueante para los otros hilos de lectura. 
+
+  Se decide si los threads son de lectura o escritura de forma aleatoria. Colateralmente este test podría encontrar deadlocks si los hubiera (en la experimentación realizada no se los encontró).
+  \item El test2 trata de mostrar que no hay inanición. Se divide en dos partes: en la primera se quiere ver que los pedidos de lectura no pueden generarle inanición a los de escritura, y en la segunda lo inverso. Como es análogo explicamos solo el primer caso.
+
+  La idea es poner a correr a la mitad de los threads (la cantidad total es un parámetro) haciendo lecturas, mandar un thread de escritura, seguido de muchos otros de lectura. Cada vez que un thread logra acceder a su sección crítica imprime por pantalla ``Leo'' o ``Escribo'' respectivamente, junto con su id (posición en el vector de threads creado). 
+
+  Si hubiese inanición sería esperable que el thread de escritura imprimiera último consistentemente a lo largo de las corridas (esto no pasó nunca en la experimentación). Es importante en este sentido que las lecturas tengan una duración lo suficientemente larga como para que no terminen antes de mandar el write.
+\end{itemize}
+
+\section{Servidor}
 Para el servidor nos basamos en \texttt{backend-mono}, haciendole los cambios necesarios para que pudo soportar más de un jugador. 
 Cada vez que acepta a un jugador crea un thread para atenderlo mediante la función \texttt{atenderdor\_de\_jugador} y guardamos la información del thread en un vector. Además creamos dos vectores de vectores de RWLock para proteger ambos tableros y todos los lugares donde en \texttt{backend-mono} se escribío o leyo algun tablero agregamos las protecciones de este.
 Para poder saber cuando todos los jugadores mandaron el mensaje de LISTO y poder pasar a la fase de batalla, creamos la variable \texttt{cant\_clientes} y la protegimos para que no la puedan modificar dos threads a la vez. Entonces cada vez que entra un cliente entra aumentamos en uno esta variable, y cada vez que un thread muere o un jugador dice LISTO esta decrementa.
