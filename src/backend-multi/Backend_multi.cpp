@@ -144,13 +144,13 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 	if (recibir_nombre_equipo(socket_fd, nombre_equipo) != 0) {
 		// el cliente cortó la comunicación, o hubo un error. Cerramos todo.
-		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
+		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
 		return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 	}
 
 	if (enviar_dimensiones(socket_fd) != 0) {
 		// se produjo un error al enviar. Cerramos todo.
-		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
+		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
 		return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 	}
 
@@ -172,7 +172,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	else{ //introduje un tercer nombre de equipo
 	  //Flasheaste cualca lince de la estepa rusa, troesma intergalactico federal.
 	  //+10, reportado, a favorito.
-	  terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true);
+	  terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
 	  return NULL;
 	}
   cout << "Esperando que juegue " << nombre_equipo << endl;
@@ -202,7 +202,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if(listo){
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 
@@ -232,7 +232,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
         if (enviar_ok(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				// OK
@@ -241,7 +241,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				// ERROR
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				quitar_partes_barco(barco_actual, *tablero_jugador, soy_equipo_1);
@@ -254,7 +254,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if(listo){
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 					return NULL;
 				}
 
@@ -270,7 +270,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
         pthread_mutex_unlock(&mutex_clientes);
 
 				if (enviar_ok(socket_fd) != 0){
-				 	terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+				 	terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 				 	return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 			}
@@ -283,7 +283,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if(listo){
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				continue;
@@ -305,7 +305,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 			if (enviar_ok(socket_fd) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
-				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 				return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 			}
 			
@@ -349,7 +349,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
         if(contenido == BARCO){
 					if (enviar_golpe(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
-						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 
@@ -357,14 +357,14 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 					// OK
 					if (enviar_estaba_golpeado(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
-						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 				}else{
 					// OK
 					if (enviar_ok(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
-						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 				}
@@ -372,7 +372,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				// ERROR
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
-					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 			}
@@ -381,7 +381,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 		else if (comando == MSG_UPDATE) {
 			if (enviar_tablero(socket_fd, soy_equipo_1) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
-				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 				return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 			}
 		}
@@ -391,7 +391,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 		}
 		else {
 			// se produjo un error al recibir. Cerramos todo.
-			terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1);
+			terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
 			return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 		}
 	}
@@ -588,11 +588,11 @@ void cerrar_servidor(int signal) {
 	exit(EXIT_SUCCESS);
 }
 
-void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo) {
+void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo, bool listo) {
 
 	cout << "Se interrumpió la comunicación con un cliente" << endl;
   pthread_mutex_lock(&mutex_clientes);
-  cant_clientes--;
+  if(!listo) cant_clientes--;
   pthread_mutex_unlock(&mutex_clientes);
 	close(socket_fd);
 	quitar_partes_barco(barco_actual, tablero_cliente, equipo);

@@ -33,7 +33,7 @@ int enviar_estaba_golpeado(int socket_fd);
 
 // otras funciones
 void cerrar_servidor(int signal);
-void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo);
+void terminar_servidor_de_jugador(int socket_fd, list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo, bool listo);
 
 void quitar_partes_barco(list<Casillero>& barco_actual, vector<vector<char> >& tablero_cliente, bool equipo);
 bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual, const vector<vector<char> >& tablero, bool equipo);
