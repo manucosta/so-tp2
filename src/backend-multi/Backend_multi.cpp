@@ -15,8 +15,8 @@ unsigned int ancho = -1;
 unsigned int alto = -1;
 
 //Agregado por nosotros
-vector<vector<RWLock>> mutex_casillero_equipo1; //Los RWLook para cada casillero del tablero del equipo 1
-vector<vector<RWLock>> mutex_casillero_equipo2; //Los RWLook para cada casillero del tablero del equipo 2
+RWLock mutex_casillero_equipo1; //RWLook para el tablero del equipo 1
+RWLock mutex_casillero_equipo2; //RWLook para el tablero del equipo 2
 vector<pthread_t> clientes; //vector de theread
 int cant_clientes = 0; //la cantidad de jugadores totales
 pthread_mutex_t mutex_clientes; //mutex para proteger cant_clientes
@@ -68,19 +68,7 @@ int main(int argc, const char* argv[]) {
   tablero_equipo2 = vector<vector<char> >(alto);
   for (unsigned int i = 0; i < alto; ++i) {
 	  tablero_equipo2[i] = vector<char>(ancho, VACIO);
-  }
-
-  //Inicializamos los RWLook de ambos tableros
-  RWLock locksito;
-  for(unsigned int i = 0; i < alto; i++){
-  	vector<RWLock> vec;
-  	mutex_casillero_equipo1.push_back(vec);
-  	mutex_casillero_equipo2.push_back(vec);
-  	for(unsigned int j = 0; j < ancho; j++){
-  		mutex_casillero_equipo1[i].push_back(locksito);
-  		mutex_casillero_equipo2[i].push_back(locksito);
-  	}
-  }
+  }  
 
   int socketfd_cliente, socket_size;
   struct sockaddr_in local, remoto;
@@ -221,13 +209,13 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				barco_actual.push_back(ficha);
         //agrego al tablero una b para diferenciar las artes de barcos de los barcos terminados.
 				if(soy_equipo_1){
-					mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
+					mutex_casillero_equipo1.wlock();
 					(*tablero_jugador)[ficha.fila][ficha.columna] = 'b';
-					mutex_casillero_equipo1[ficha.fila][ficha.columna].wunlock();
+					mutex_casillero_equipo1.wunlock();
 				}else{
-					mutex_casillero_equipo2[ficha.fila][ficha.columna].wlock();
+					mutex_casillero_equipo2.wlock();
 					(*tablero_jugador)[ficha.fila][ficha.columna] = 'b';
-					mutex_casillero_equipo2[ficha.fila][ficha.columna].wunlock();
+					mutex_casillero_equipo2.wunlock();
 				}
 
         if (enviar_ok(socket_fd) != 0) {
@@ -293,13 +281,13 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 			for (list<Casillero>::const_iterator casillero = barco_actual.begin(); casillero != barco_actual.end(); casillero++) {
 				if(soy_equipo_1) {
-	      	mutex_casillero_equipo1[casillero->fila][casillero->columna].wlock();
+	      	mutex_casillero_equipo1.wlock();
 					(*tablero_jugador)[casillero->fila][casillero->columna] = casillero->contenido;
-	      	mutex_casillero_equipo1[casillero->fila][casillero->columna].wunlock();
+	      	mutex_casillero_equipo1.wunlock();
 	      } else {
-	      	mutex_casillero_equipo2[casillero->fila][casillero->columna].wlock();
+	      	mutex_casillero_equipo2.wlock();
 					(*tablero_jugador)[casillero->fila][casillero->columna] = casillero->contenido;
-	      	mutex_casillero_equipo2[casillero->fila][casillero->columna].wunlock();
+	      	mutex_casillero_equipo2.wunlock();
 	      }
 			}
 
@@ -326,24 +314,24 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				//Si había un BARCO, pongo una BOMBA
 				char contenido; //leo para ver que hay en esa posicion
 				if(soy_equipo_1){
-		      mutex_casillero_equipo1[ficha.fila][ficha.columna].rlock();
+		      mutex_casillero_equipo1.rlock();
 		      contenido = (*tablero_rival)[ficha.fila][ficha.columna];
-		      mutex_casillero_equipo1[ficha.fila][ficha.columna].runlock();
+		      mutex_casillero_equipo1.runlock();
           if(contenido == BARCO){
             //es un barco => pongo una bomba
-            mutex_casillero_equipo1[ficha.fila][ficha.columna].wlock();
+            mutex_casillero_equipo1.wlock();
 			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
-			      mutex_casillero_equipo1[ficha.fila][ficha.columna].wunlock();
+			      mutex_casillero_equipo1.wunlock();
           }
 				}else{
-					mutex_casillero_equipo2[ficha.fila][ficha.columna].rlock();
+					mutex_casillero_equipo2.rlock();
 		      contenido = (*tablero_rival)[ficha.fila][ficha.columna];
-		      mutex_casillero_equipo2[ficha.fila][ficha.columna].runlock();
+		      mutex_casillero_equipo2.runlock();
           if(contenido == BARCO){
             //es un barco => pongo una bomba
-            mutex_casillero_equipo2[ficha.fila][ficha.columna].wlock();
+            mutex_casillero_equipo2.wlock();
 			      (*tablero_rival)[ficha.fila][ficha.columna] = BOMBA;
-			      mutex_casillero_equipo2[ficha.fila][ficha.columna].wunlock();
+			      mutex_casillero_equipo2.wunlock();
           }
 				}
         if(contenido == BARCO){
@@ -523,13 +511,13 @@ int enviar_tablero(int socket_fd, bool equipo1) {
 			char contenido;
       //leo el contenido de cada casillero del tablero
 			if(equipo1){
-	      mutex_casillero_equipo1[fila][col].rlock();
+	      mutex_casillero_equipo1.rlock();
 	      contenido = (*tablero)[fila][col];
-	      mutex_casillero_equipo1[fila][col].runlock();
+	      mutex_casillero_equipo1.runlock();
 			}else{
-	      mutex_casillero_equipo2[fila][col].rlock();
+	      mutex_casillero_equipo2.rlock();
 	      contenido = (*tablero)[fila][col];
-	      mutex_casillero_equipo2[fila][col].runlock();
+	      mutex_casillero_equipo2.runlock();
 	    }
 			switch(contenido){
 				case VACIO:
@@ -603,13 +591,13 @@ void quitar_partes_barco(list<Casillero>& barco_actual, vector<vector<char> >& t
 	for (list<Casillero>::const_iterator casillero = barco_actual.begin(); casillero != barco_actual.end(); casillero++) {
     //pasamos por cada lugar de barco actual poniendo VACIO en vez de b
 		if(equipo){
-			mutex_casillero_equipo1[casillero->fila][casillero->columna].wlock();
+			mutex_casillero_equipo1.wlock();
 			tablero_cliente[casillero->fila][casillero->columna] = VACIO;
-			mutex_casillero_equipo1[casillero->fila][casillero->columna].wunlock();
+			mutex_casillero_equipo1.wunlock();
 		}else{
-			mutex_casillero_equipo2[casillero->fila][casillero->columna].wlock();
+			mutex_casillero_equipo2.wlock();
 			tablero_cliente[casillero->fila][casillero->columna] = VACIO;
-			mutex_casillero_equipo2[casillero->fila][casillero->columna].wunlock();
+			mutex_casillero_equipo2.wunlock();
 		}
 	}
 	barco_actual.clear();
@@ -625,17 +613,17 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 
 	// Leo el casillero, si está ocupado, tampoco es válida
 	if(equipo){
-		mutex_casillero_equipo1[ficha.fila][ficha.columna].rlock();
+		mutex_casillero_equipo1.rlock();
 		if (tablero[ficha.fila][ficha.columna] != VACIO) {
 			return false;
 		}
-		mutex_casillero_equipo1[ficha.fila][ficha.columna].runlock();
+		mutex_casillero_equipo1.runlock();
 	}else{
-		mutex_casillero_equipo2[ficha.fila][ficha.columna].rlock();
+		mutex_casillero_equipo2.rlock();
 		if (tablero[ficha.fila][ficha.columna] != VACIO) {
 			return false;
 		}
-		mutex_casillero_equipo2[ficha.fila][ficha.columna].runlock();
+		mutex_casillero_equipo2.runlock();
 	}
 
 	if (barco_actual.size() > 0) {
@@ -657,17 +645,17 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 			for (unsigned int columna = mas_distante.columna; columna != ficha.columna; columna += paso) {
 				// el casillero DEBE estar ocupado en el tablero
 				if(equipo){
-					mutex_casillero_equipo1[ficha.fila][columna].rlock();
+					mutex_casillero_equipo1.rlock();
 					if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
 						return false;
 					}
-					mutex_casillero_equipo1[ficha.fila][columna].runlock();
+					mutex_casillero_equipo1.runlock();
 				}else{
-					mutex_casillero_equipo2[ficha.fila][columna].rlock();
+					mutex_casillero_equipo2.rlock();
 					if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
 						return false;
 					}
-					mutex_casillero_equipo2[ficha.fila][columna].runlock();
+					mutex_casillero_equipo2.runlock();
 				}
 				
 			}
@@ -685,17 +673,17 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 			for (unsigned int fila = mas_distante.fila; fila != ficha.fila; fila += paso) {
 				// el casillero DEBE estar ocupado en el tablero
 				if(equipo){
-					mutex_casillero_equipo1[fila][ficha.columna].rlock();
+					mutex_casillero_equipo1.rlock();
 					if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
 						return false;
 					}
-					mutex_casillero_equipo1[fila][ficha.columna].runlock();
+					mutex_casillero_equipo1.runlock();
 				}else{
-					mutex_casillero_equipo2[fila][ficha.columna].rlock();
+					mutex_casillero_equipo2.rlock();
 					if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
 						return false;
 					}
-					mutex_casillero_equipo2[fila][ficha.columna].runlock();
+					mutex_casillero_equipo2.runlock();
 				}
 			}
 		}
