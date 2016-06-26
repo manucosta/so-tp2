@@ -615,15 +615,18 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 	if(equipo){
 		mutex_casillero_equipo1.rlock();
 		if (tablero[ficha.fila][ficha.columna] != VACIO) {
-			return false;
+			mutex_casillero_equipo1.runlock();
+      return false;
 		}
-		mutex_casillero_equipo1.runlock();
+    mutex_casillero_equipo1.runlock();
+		
 	}else{
 		mutex_casillero_equipo2.rlock();
 		if (tablero[ficha.fila][ficha.columna] != VACIO) {
-			return false;
+			mutex_casillero_equipo2.runlock();
+      return false;
 		}
-		mutex_casillero_equipo2.runlock();
+    mutex_casillero_equipo2.runlock();
 	}
 
 	if (barco_actual.size() > 0) {
@@ -675,13 +678,15 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 				if(equipo){
 					mutex_casillero_equipo1.rlock();
 					if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
-						return false;
+						mutex_casillero_equipo1.runlock();
+            return false;
 					}
 					mutex_casillero_equipo1.runlock();
 				}else{
 					mutex_casillero_equipo2.rlock();
 					if (!(puso_barco_en(fila, ficha.columna, barco_actual)) && tablero[fila][ficha.columna] == VACIO) {
-						return false;
+						mutex_casillero_equipo2.runlock();
+            return false;
 					}
 					mutex_casillero_equipo2.runlock();
 				}
