@@ -113,9 +113,11 @@ int main(int argc, const char* argv[]) {
   }
   close(socket_servidor);
   //Espero a todos los threads para irme
+  /**
   for(unsigned int i = 0; i < clientes.size(); i++){
     pthread_join(clientes[i], NULL);
   }
+  **/
 
   return 0;
 }
@@ -650,13 +652,15 @@ bool es_ficha_valida(const Casillero& ficha, const list<Casillero>& barco_actual
 				if(equipo){
 					mutex_casillero_equipo1.rlock();
 					if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
-						return false;
+						mutex_casillero_equipo1.runlock();
+            return false;
 					}
 					mutex_casillero_equipo1.runlock();
 				}else{
 					mutex_casillero_equipo2.rlock();
 					if (!(puso_barco_en(ficha.fila, columna, barco_actual)) && tablero[ficha.fila][columna] == VACIO) {
-						return false;
+						mutex_casillero_equipo2.runlock();
+            return false;
 					}
 					mutex_casillero_equipo2.runlock();
 				}
