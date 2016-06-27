@@ -17,7 +17,7 @@ unsigned int alto = -1;
 //Agregado por nosotros
 RWLock mutex_casillero_equipo1; //RWLook para el tablero del equipo 1
 RWLock mutex_casillero_equipo2; //RWLook para el tablero del equipo 2
-vector<pthread_t> clientes; //vector de theread
+vector<pthread_t> clientes; //vector de threads
 int cant_clientes = 0; //la cantidad de jugadores totales
 pthread_mutex_t mutex_clientes; //mutex para proteger cant_clientes
 pthread_mutex_t mutex_equipos; //mutex para proteger los nombres de los equipos
@@ -101,6 +101,10 @@ int main(int argc, const char* argv[]) {
   socket_size = sizeof(remoto);
   while (!peleando) { //recibo jugadores mientras todavía estoy en la fase de crear barcos.
   	if ((socketfd_cliente = accept(socket_servidor, (struct sockaddr*) &remoto, (socklen_t*) &socket_size)) == -1)
+      /*
+      accept es bloqueante, eso genera una situacion medio rara.
+      Preguntar despues
+      */
   		cerr << "Error al aceptar conexion" << endl;
   	else {
   		pthread_t cliente; //Por cada nuevo jugador creamos un nuevo thread
@@ -113,11 +117,9 @@ int main(int argc, const char* argv[]) {
   }
   close(socket_servidor);
   //Espero a todos los threads para irme
-  /**
   for(unsigned int i = 0; i < clientes.size(); i++){
     pthread_join(clientes[i], NULL);
   }
-  **/
 
   return 0;
 }
@@ -135,13 +137,13 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	if (recibir_nombre_equipo(socket_fd, nombre_equipo) != 0) {
 		// el cliente cortó la comunicación, o hubo un error. Cerramos todo.
 		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
-		return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+		pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 	}
 
 	if (enviar_dimensiones(socket_fd) != 0) {
 		// se produjo un error al enviar. Cerramos todo.
 		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
-		return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+		pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 	}
 
 	bool soy_equipo_1; //variable para saber si soy equipo 1 o equipo 2
@@ -160,10 +162,9 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	  soy_equipo_1 = false;
 	}
 	else{ //introduje un tercer nombre de equipo
-	  //Flasheaste cualca lince de la estepa rusa, troesma intergalactico federal.
-	  //+10, reportado, a favorito.
-	  terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
-	  return NULL;
+	  cout << "Nombre inválido" << endl;
+    terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
+	  pthread_exit(NULL);
 	}
   cout << "Esperando que juegue " << nombre_equipo << endl;
 
@@ -193,7 +194,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+					pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 
 				continue;
@@ -223,7 +224,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
         if (enviar_ok(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+					pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				// OK
 			}
@@ -232,7 +233,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+					pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				quitar_partes_barco(barco_actual, *tablero_jugador, soy_equipo_1);
 			}
@@ -245,7 +246,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-					return NULL;
+					pthread_exit(NULL);
 				}
 
 			}else{
@@ -261,7 +262,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 
 				if (enviar_ok(socket_fd) != 0){
 				 	terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-				 	return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+				 	pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 			}
 
@@ -274,7 +275,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+					pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 				continue;
 			}
@@ -296,7 +297,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if (enviar_ok(socket_fd) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
 				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-				return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+				pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 			}
 			
 			barco_actual.clear();
@@ -340,7 +341,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 					if (enviar_golpe(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
 						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+						pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 
 				}else if(contenido == BOMBA){
@@ -348,14 +349,14 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 					if (enviar_estaba_golpeado(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
 						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+						pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 				}else{
 					// OK
 					if (enviar_ok(socket_fd) != 0) {
 						// se produjo un error al enviar. Cerramos todo.
 						terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-						return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+						pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 					}
 				}
 			}else {
@@ -363,7 +364,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 				if (enviar_error(socket_fd) != 0) {
 					// se produjo un error al enviar. Cerramos todo.
 					terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-					return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+					pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 				}
 			}
 
@@ -372,7 +373,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 			if (enviar_tablero(socket_fd, soy_equipo_1) != 0) {
 				// se produjo un error al enviar. Cerramos todo.
 				terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-				return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+				pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 			}
 		}
 		else if (comando == MSG_INVALID) {
@@ -382,7 +383,7 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 		else {
 			// se produjo un error al recibir. Cerramos todo.
 			terminar_servidor_de_jugador(socket_fd, barco_actual, *tablero_jugador, soy_equipo_1, listo);
-			return NULL; //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
+			pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
 		}
 	}
 }
