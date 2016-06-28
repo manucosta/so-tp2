@@ -152,23 +152,29 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	}
 
 	bool soy_equipo_1; //variable para saber si soy equipo 1 o equipo 2
+	pthread_mutex_lock(&mutex_equipos);
 	if(nombre_equipo1 == "") { //si equipo 1 no tiene nombre, creamos el equipo 1 con el nombre que introdujo el jugador
 	  nombre_equipo1 = nombre_equipo;
+	  pthread_mutex_unlock(&mutex_equipos);
 	  soy_equipo_1 = true;
 	} 
 	else if(nombre_equipo1 == nombre_equipo) { //soy equipo 1
+	  pthread_mutex_unlock(&mutex_equipos);
 	  soy_equipo_1 = true;
 	}
 	else if(nombre_equipo2 == "") { //no soy del equipo 1 y todavia no estaba creado el equipo 2. Así que los creo 
 	  nombre_equipo2 = nombre_equipo;
+	  pthread_mutex_unlock(&mutex_equipos);
 	  soy_equipo_1 = false;
 	}
 	else if(nombre_equipo2 == nombre_equipo) { //soy del equipo 2
+	  pthread_mutex_unlock(&mutex_equipos);
 	  soy_equipo_1 = false;
 	}
 	else{ //introduje un tercer nombre de equipo
+	  pthread_mutex_unlock(&mutex_equipos);
 	  cout << "Nombre inválido" << endl;
-    terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
+      terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
 	  pthread_exit(NULL);
 	}
   cout << "Esperando que juegue " << nombre_equipo << endl;
