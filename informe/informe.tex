@@ -34,7 +34,7 @@
 \pagestyle{fancy}
 \thispagestyle{fancy}
 \addtolength{\headheight}{1pt}
-\lhead{Sistemas Operativos: TP2}
+\lhead{Sistemas Operativos: RTP2}
 \rhead{$1º$ cuatrimestre de 2016}
 \cfoot{\thepage\ / \pageref{LastPage}}
 \renewcommand{\footrulewidth}{0.4pt}
@@ -44,7 +44,7 @@
 
 % Datos de caratula
 \materia{Sistemas Operativos}
-\titulo{Trabajo Práctico 2}
+\titulo{Recuperatorio del Trabajo Práctico 2}
 \subtitulo{Pthreads}
 \grupo{}
 
@@ -52,7 +52,7 @@
 \integrante{Coy, Camila Paula}{033/14}{camicoy94@gmail.com}
 \integrante{Ginsberg, Mario Ezequiel}{145/14}{ezequielginsberg@gmail.com}
 
-\fecha{8 de Junio de 2016}
+\fecha{28 de Junio de 2016}
 
 \begin{document}
 \maketitle
@@ -99,7 +99,19 @@ Para testear el correcto funcionamiento de la clase RWLock hicimos dos tipos de 
 Para el servidor nos basamos en \texttt{backend-mono}, haciéndole los cambios necesarios para que pudo soportar más de un jugador. 
 
 Cada vez que acepta a un jugador crea un thread para atenderlo mediante la función \texttt{atenderdor\_de\_jugador} y guardamos la información del thread en un vector. Además creamos dos matrices de RWLock para proteger ambos tableros, y en todos los lugares donde en \texttt{backend-mono} se escribió o leyo algún casillero de algún tablero agregamos las protecciones correspondientes.
-Para poder saber cuando todos los jugadores mandaron el mensaje de LISTO y poder pasar a la fase de batalla, creamos la variable \texttt{cant\_clientes} y la protegimos para que no la puedan modificar dos threads a la vez. Entonces cada vez que entra un cliente entra aumentamos en uno esta variable, y cada vez que un thread muere o un jugador dice LISTO esta decrementa. Además ahora a parte de solo tener la variable global peleando, cada thread tiene una variable local \texttt{listo}, lo que evita que cuando un cliente pase a pelear todos los demás lo hagan.
+Para poder saber cuando todos los jugadores mandaron el mensaje de LISTO y poder pasar a la fase de batalla, creamos la variable \texttt{cant\_clientes} y la protegimos para que no la puedan modificar dos threads a la vez. Entonces cada vez que entra un cliente aumentamos en uno esta variable, y cada vez que un thread muere o un jugador dice LISTO esta decrementa. Además ahora a parte de solo tener la variable global peleando, cada thread tiene una variable local \texttt{listo}, lo que evita que cuando un cliente pase a pelear todos los demás lo hagan.
 
+\section{Informe de Modificaciones}
+En virtud de la devolución del TP, realizamos las siguientes correcciones:
+
+\begin{itemize}
+	\item Eliminamos las matrices de RWLock, y en su lugar utilizamos dos variables de tipo \mbox{RWLock} que protegen cada una a un tablero en lugar de proteger por casillero.
+	\item Cambiamos los \texttt{return NULL} por \texttt{pthread\_exit(NULL)} para mantener el standard \mbox{POSIX}.
+	\item Protegimos los nombres de los equipos con un mutex.
+	\item Como consecuencia de que la función \texttt{accept} es bloqueante, podía darse el caso en el que un nuevo cliente entrara durante la etapa de pelea. Para solventar esto agregamos una verificación de la variable \texttt{peleando} al retornar del \texttt{accept}.
+	\item El error más importante que encontramos fue en la función \texttt{es\_ficha\_valida}: había casos en los cuales pedíamos \texttt{mutex\_equipo\_x} y luego que al entrar en un if, retornaba sin cerrarlo. 
+\end{itemize}
+
+El código entregado compila y pasa satisfactoriamente los test realizados por cada uno de nosotros.
 
 \end{document}
