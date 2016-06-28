@@ -107,6 +107,10 @@ int main(int argc, const char* argv[]) {
       */
   		cerr << "Error al aceptar conexion" << endl;
   	else {
+  		if(peleando) {					   // No queremos recibir jugadores nuevos durante la pelea
+  			close(socketfd_cliente); // Cerramos el socket del jugador
+  			break;
+  		}
   		pthread_t cliente; //Por cada nuevo jugador creamos un nuevo thread
   		pthread_mutex_lock(&mutex_clientes);
   		clientes.push_back(cliente);
@@ -134,10 +138,6 @@ void* atendedor_de_jugador(void* p_socket_fd) {
 	 // lista de casilleros que ocupa el barco actual (aún no confirmado)
 	list<Casillero> barco_actual;
 	
-	if(peleando){
-		terminar_servidor_de_jugador(socket_fd, barco_actual, tablero_equipo1, true, listo);
-		pthread_exit(NULL); //como terminamos el servidor del jugador devolvemos NULL para que el thread termine
-	}
 
 	if (recibir_nombre_equipo(socket_fd, nombre_equipo) != 0) {
 		// el cliente cortó la comunicación, o hubo un error. Cerramos todo.
