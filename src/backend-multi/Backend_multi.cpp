@@ -107,6 +107,7 @@ int main(int argc, const char* argv[]) {
       */
   		cerr << "Error al aceptar conexion" << endl;
   	else {
+  		if(peleando) break;
   		pthread_t cliente; //Por cada nuevo jugador creamos un nuevo thread
   		pthread_mutex_lock(&mutex_clientes);
   		clientes.push_back(cliente);
